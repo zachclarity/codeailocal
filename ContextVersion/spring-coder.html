@@ -380,6 +380,13 @@
         </div>
       </div>
 
+      <!-- Tab: Snippet detail view -->
+      <div id="snippet-detail-view" class="hidden flex-1 overflow-auto">
+        <div id="snippet-detail-content" class="p-6 space-y-5">
+          <!-- Populated by viewSnippet() -->
+        </div>
+      </div>
+
       <!-- Tab: Add snippet form -->
       <div id="snippet-add-view" class="hidden flex-1 overflow-auto p-6">
         <div class="space-y-4">
@@ -591,7 +598,7 @@
     // ══════════════════════════════════════════
     // SNIPPET MANAGER
     // ══════════════════════════════════════════
-    let snippetViewMode = 'list'; // 'list' or 'add'
+    let snippetViewMode = 'list'; // 'list', 'detail', or 'add'
 
     function openSnippetManager() {
       document.getElementById('snippet-modal').classList.remove('hidden');
@@ -602,38 +609,73 @@
 
     function closeSnippetManager() {
       document.getElementById('snippet-modal').classList.add('hidden');
-      // Refresh the RAG badge count
       checkRagHealth();
     }
 
     function toggleSnippetView() {
-      if (snippetViewMode === 'list') {
-        snippetViewMode = 'add';
-        showSnippetAddView();
-      } else {
+      if (snippetViewMode === 'add') {
         snippetViewMode = 'list';
         showSnippetListView();
+      } else {
+        snippetViewMode = 'add';
+        showSnippetAddView();
       }
     }
 
     function showSnippetListView() {
+      snippetViewMode = 'list';
       document.getElementById('snippet-list-view').classList.remove('hidden');
+      document.getElementById('snippet-detail-view').classList.add('hidden');
       document.getElementById('snippet-add-view').classList.add('hidden');
       document.getElementById('snippet-view-toggle').textContent = '+ Add New';
     }
 
-    function showSnippetAddView() {
+    function showSnippetDetailView() {
+      snippetViewMode = 'detail';
       document.getElementById('snippet-list-view').classList.add('hidden');
+      document.getElementById('snippet-detail-view').classList.remove('hidden');
+      document.getElementById('snippet-add-view').classList.add('hidden');
+      document.getElementById('snippet-view-toggle').textContent = '← Back to List';
+    }
+
+    function showSnippetAddView() {
+      snippetViewMode = 'add';
+      document.getElementById('snippet-list-view').classList.add('hidden');
+      document.getElementById('snippet-detail-view').classList.add('hidden');
       document.getElementById('snippet-add-view').classList.remove('hidden');
       document.getElementById('snippet-view-toggle').textContent = '← Back to List';
       document.getElementById('snip-error').classList.add('hidden');
-      // Clear form
       document.getElementById('snip-title').value = '';
       document.getElementById('snip-id').value = '';
       document.getElementById('snip-description').value = '';
       document.getElementById('snip-code').value = '';
       document.getElementById('snip-category').value = 'rest';
     }
+
+    // Category color map (shared)
+    const catColors = {
+      rest: 'bg-blue-500/10 text-blue-500',
+      entity: 'bg-purple-500/10 text-purple-500',
+      service: 'bg-amber-500/10 text-amber-500',
+      repo: 'bg-cyan-500/10 text-cyan-500',
+      dto: 'bg-pink-500/10 text-pink-500',
+      security: 'bg-red-500/10 text-red-500',
+      test: 'bg-green-500/10 text-green-500',
+      exception: 'bg-orange-500/10 text-orange-500',
+      config: 'bg-teal-500/10 text-teal-500',
+    };
+
+    const catColorsBorder = {
+      rest: 'border-blue-500/20',
+      entity: 'border-purple-500/20',
+      service: 'border-amber-500/20',
+      repo: 'border-cyan-500/20',
+      dto: 'border-pink-500/20',
+      security: 'border-red-500/20',
+      test: 'border-green-500/20',
+      exception: 'border-orange-500/20',
+      config: 'border-teal-500/20',
+    };
 
     async function loadSnippetList() {
       const container = document.getElementById('snippet-list');
@@ -651,23 +693,10 @@
           return;
         }
 
-        // Category color map
-        const catColors = {
-          rest: 'bg-blue-500/10 text-blue-500',
-          entity: 'bg-purple-500/10 text-purple-500',
-          service: 'bg-amber-500/10 text-amber-500',
-          repo: 'bg-cyan-500/10 text-cyan-500',
-          dto: 'bg-pink-500/10 text-pink-500',
-          security: 'bg-red-500/10 text-red-500',
-          test: 'bg-green-500/10 text-green-500',
-          exception: 'bg-orange-500/10 text-orange-500',
-          config: 'bg-teal-500/10 text-teal-500',
-        };
-
         container.innerHTML = data.snippets.map(s => {
           const colorClass = catColors[s.category] || 'bg-gray-500/10 text-gray-500';
           return `
-            <div class="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 dark:border-forge-800 hover:border-spring-500/30 hover:bg-spring-500/5 transition-all group">
+            <div class="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 dark:border-forge-800 hover:border-spring-500/30 hover:bg-spring-500/5 transition-all group cursor-pointer" onclick="viewSnippet('${escapeHtml(s.id)}')">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-0.5">
                   <span class="text-sm font-medium truncate">${escapeHtml(s.title)}</span>
@@ -675,14 +704,138 @@
                 </div>
                 <p class="text-xs text-gray-400 dark:text-gray-500 truncate">${escapeHtml(s.description || s.id)}</p>
               </div>
-              <button onclick="deleteSnippet('${escapeHtml(s.id)}')" class="ml-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-gray-300 hover:text-red-500 transition-all" title="Delete snippet">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/></svg>
-              </button>
+              <div class="flex items-center gap-1 ml-3">
+                <button onclick="event.stopPropagation(); deleteSnippet('${escapeHtml(s.id)}')" class="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-gray-300 hover:text-red-500 transition-all" title="Delete snippet">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/></svg>
+                </button>
+                <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-spring-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              </div>
             </div>`;
         }).join('');
 
       } catch (e) {
         container.innerHTML = `<p class="text-sm text-red-400 text-center py-8">Failed to load snippets: ${e.message}<br><span class="text-xs text-gray-500">Is the RAG service running?</span></p>`;
+      }
+    }
+
+    async function viewSnippet(snippetId) {
+      showSnippetDetailView();
+      const container = document.getElementById('snippet-detail-content');
+      container.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <svg class="w-5 h-5 animate-spin text-spring-500 mr-2" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" class="opacity-75"/></svg>
+          <span class="text-sm text-gray-400">Loading snippet details...</span>
+        </div>`;
+
+      try {
+        const res = await fetch(`${ragBaseUrl}/snippets/${encodeURIComponent(snippetId)}`, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const s = await res.json();
+
+        const colorClass = catColors[s.category] || 'bg-gray-500/10 text-gray-500';
+        const borderClass = catColorsBorder[s.category] || 'border-gray-500/20';
+
+        // Count code lines
+        const codeLines = s.code.split('\n');
+        const lineNums = codeLines.map((_, i) => i + 1).join('\n');
+
+        container.innerHTML = `
+          <!-- Header -->
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <h4 class="text-lg font-bold">${escapeHtml(s.title)}</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded ${colorClass}">${escapeHtml(s.category)}</span>
+              </div>
+              <p class="text-sm text-gray-400 dark:text-gray-500">${escapeHtml(s.description)}</p>
+              <p class="text-[11px] font-mono text-gray-300 dark:text-gray-600 mt-1">ID: ${escapeHtml(s.id)} · ${codeLines.length} lines</p>
+            </div>
+            <button onclick="useSnippetAsTemplate('${escapeHtml(s.id)}', '${escapeHtml(s.category)}')" class="shrink-0 flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-spring-500 text-white hover:bg-spring-600 transition-colors" title="Use this snippet's purpose as a prompt template">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              Use as Template
+            </button>
+          </div>
+
+          <!-- When This Snippet Is Used -->
+          <div class="rounded-xl border ${borderClass} bg-gray-50/50 dark:bg-forge-850/50 p-4 space-y-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-spring-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <h5 class="text-sm font-semibold">When This Snippet Is Used</h5>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">${escapeHtml(s.usage.description)}</p>
+
+            <div>
+              <p class="text-[11px] font-mono text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">Trigger Keywords</p>
+              <div class="flex flex-wrap gap-1.5">
+                ${s.usage.trigger_keywords.map(kw => `<span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-spring-500/10 text-spring-600 dark:text-spring-400">${escapeHtml(kw)}</span>`).join('')}
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[11px] font-mono text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">Example Prompts That Match</p>
+              <div class="space-y-1">
+                ${s.usage.example_prompts.map(p => `
+                  <div class="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-spring-500 transition-colors" onclick="useExamplePrompt(this)" title="Click to use this prompt">
+                    <svg class="w-3 h-3 mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    <span>${escapeHtml(p)}</span>
+                  </div>`).join('')}
+              </div>
+            </div>
+
+            <p class="text-[11px] text-gray-400 dark:text-gray-600 italic">Category filter: When "${escapeHtml(s.category)}" is detected, the search is narrowed to this category's snippets.</p>
+          </div>
+
+          <!-- Code Preview -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-[11px] font-mono text-gray-400 dark:text-gray-500 uppercase tracking-wider">Code Preview</p>
+              <button onclick="copySnippetCode()" id="copy-snippet-btn" class="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-lg bg-gray-100 dark:bg-forge-800 text-gray-400 hover:text-spring-500 transition-colors">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="rounded-xl border border-gray-100 dark:border-forge-800 overflow-hidden bg-white dark:bg-forge-950">
+              <pre class="flex text-[12px] leading-[1.6] max-h-[400px] overflow-auto"><code class="py-3 pl-3 pr-2 text-gray-300 dark:text-forge-800 select-none border-r border-gray-100 dark:border-forge-800 text-right" style="min-width:3ch">${lineNums}</code><code id="snippet-code-display" class="py-3 px-4 flex-1 overflow-x-auto whitespace-pre text-gray-700 dark:text-gray-300 font-mono">${escapeHtml(s.code)}</code></pre>
+            </div>
+          </div>
+        `;
+
+      } catch (e) {
+        container.innerHTML = `<p class="text-sm text-red-400 text-center py-8">Failed to load snippet: ${e.message}</p>`;
+      }
+    }
+
+    function useSnippetAsTemplate(snippetId, category) {
+      // Find a matching template or build a generic one
+      const tpl = templates[category];
+      if (tpl) {
+        document.getElementById('prompt-input').value = tpl;
+      } else {
+        document.getElementById('prompt-input').value = `Create a Spring Boot ${category} following best practices with proper annotations, validation, and documentation`;
+      }
+      closeSnippetManager();
+      if (!ragEnabled) {
+        toggleRag(); // Auto-enable RAG so the snippet gets used
+      }
+      showToast(`Template loaded — RAG will use "${category}" snippets`);
+    }
+
+    function useExamplePrompt(el) {
+      const prompt = el.querySelector('span').textContent;
+      document.getElementById('prompt-input').value = prompt;
+      closeSnippetManager();
+      if (!ragEnabled) {
+        toggleRag();
+      }
+      showToast('Prompt loaded — click Generate');
+    }
+
+    function copySnippetCode() {
+      const codeEl = document.getElementById('snippet-code-display');
+      if (codeEl) {
+        navigator.clipboard.writeText(codeEl.textContent).then(() => {
+          showToast('Code copied to clipboard');
+        });
       }
     }
 

@@ -111,6 +111,10 @@ class ChromaRESTClient:
         body = {"include": include or ["metadatas"]}
         return self._req("POST", f"{self._db_prefix}/collections/{self.collection_id}/get", json=body).json()
 
+    def get_by_ids(self, ids: list, include: Optional[list] = None) -> dict:
+        body = {"ids": ids, "include": include or ["documents", "metadatas"]}
+        return self._req("POST", f"{self._db_prefix}/collections/{self.collection_id}/get", json=body).json()
+
     def delete_collection(self, name: str):
         self._req("DELETE", f"{self._db_prefix}/collections/{name}")
         self.collection_id = None
@@ -548,6 +552,116 @@ async def list_snippets():
             meta = results["metadatas"][i] if results.get("metadatas") else {}
             items.append({"id": results["ids"][i], **meta})
     return {"count": len(items), "snippets": items}
+
+
+# Category trigger keywords — mirrors the frontend detectCategory() logic
+CATEGORY_TRIGGERS = {
+    "rest": ["controller", "rest", "endpoint", "api", "crud", "http", "request mapping"],
+    "entity": ["entity", "jpa", "table", "column", "hibernate", "orm", "mapping"],
+    "service": ["service", "business logic", "transactional", "service layer"],
+    "repo": ["repository", "query", "dao", "jpql", "specification", "findby"],
+    "dto": ["dto", "mapper", "mapstruct", "transfer object", "request body", "response body"],
+    "security": ["security", "jwt", "auth", "authentication", "authorization", "cors", "filter"],
+    "test": ["test", "junit", "mock", "mockito", "assertion", "testcontainers", "integration test"],
+    "exception": ["exception", "error", "handler", "controlleradvice", "error response", "validation error"],
+    "config": ["config", "configuration", "application.yml", "properties", "cache", "redis", "actuator"],
+}
+
+
+@app.get("/snippets/{snippet_id}")
+async def get_snippet(snippet_id: str):
+    """Get full snippet details including code and usage context."""
+    if chroma is None:
+        raise HTTPException(status_code=503, detail="ChromaDB not initialized")
+
+    results = chroma.get_by_ids(
+        ids=[snippet_id],
+        include=["documents", "metadatas"],
+    )
+
+    if not results.get("ids") or not results["ids"]:
+        raise HTTPException(status_code=404, detail=f"Snippet '{snippet_id}' not found")
+
+    meta = results["metadatas"][0] if results.get("metadatas") else {}
+    doc = results["documents"][0] if results.get("documents") else ""
+
+    # Extract code from document (format: title\ndescription\n\ncode)
+    parts = doc.split("\n\n", 1)
+    code = parts[1] if len(parts) > 1 else doc
+
+    category = meta.get("category", "other")
+
+    # Build usage info
+    triggers = CATEGORY_TRIGGERS.get(category, [])
+    example_prompts = _get_example_prompts(category)
+
+    return {
+        "id": snippet_id,
+        "title": meta.get("title", ""),
+        "category": category,
+        "description": meta.get("description", ""),
+        "code": code,
+        "usage": {
+            "trigger_keywords": triggers,
+            "description": f"This snippet is automatically retrieved when your prompt mentions keywords related to '{category}'. "
+                           f"The RAG pipeline embeds your prompt and finds the most semantically similar snippets, "
+                           f"so it can also match conceptually even without exact keyword matches.",
+            "category_filter": f"When the frontend detects category '{category}', ChromaDB narrows its search to only '{category}' snippets for higher relevance.",
+            "example_prompts": example_prompts,
+        },
+    }
+
+
+def _get_example_prompts(category: str) -> list[str]:
+    """Return example prompts that would trigger a given category."""
+    prompts = {
+        "rest": [
+            "Create a REST controller for Products with CRUD endpoints",
+            "Build an API endpoint with pagination and validation",
+            "Make a Spring controller with Swagger annotations",
+        ],
+        "entity": [
+            "Create a JPA entity for Payment with UUID primary key",
+            "Build a Hibernate entity with audit fields and relationships",
+            "Design a database table mapping for an Order entity",
+        ],
+        "service": [
+            "Create a service layer for UserService with transactions",
+            "Build a Spring service with exception handling and logging",
+            "Write business logic for order processing",
+        ],
+        "repo": [
+            "Create a Spring Data repository with custom queries",
+            "Build a JPA repository with specifications and projections",
+            "Write JPQL queries for a Product repository",
+        ],
+        "dto": [
+            "Create DTOs and a MapStruct mapper for Customer",
+            "Build request/response DTOs with validation annotations",
+            "Design transfer objects for the API layer",
+        ],
+        "security": [
+            "Create a Spring Security config with JWT authentication",
+            "Build a security filter chain with role-based access",
+            "Configure CORS and authentication for REST APIs",
+        ],
+        "test": [
+            "Write JUnit 5 tests for a UserService with Mockito",
+            "Create integration tests with Testcontainers",
+            "Build unit tests with BDD given/when/then style",
+        ],
+        "exception": [
+            "Create a global exception handler with @ControllerAdvice",
+            "Build structured error responses for REST APIs",
+            "Handle validation errors with field-level details",
+        ],
+        "config": [
+            "Create application.yml with PostgreSQL and HikariCP",
+            "Configure Redis caching with per-cache TTLs",
+            "Set up Spring Boot actuator health and metrics",
+        ],
+    }
+    return prompts.get(category, ["Prompts related to " + category])
 
 
 @app.post("/snippets/reload")
