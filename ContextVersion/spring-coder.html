@@ -623,6 +623,7 @@
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let tokenCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -639,12 +640,29 @@
 
           try {
             const event = JSON.parse(data);
+
+            // Handle error events from the RAG service
+            if (event.type === 'error') {
+              generatedCode += `// ERROR: ${event.error}\n`;
+              renderCode(generatedCode);
+              continue;
+            }
+
             if (event.type === 'content_block_delta' && event.delta?.text) {
+              tokenCount++;
               generatedCode += event.delta.text;
               renderCode(generatedCode);
             }
-          } catch {}
+          } catch (parseErr) {
+            console.warn('SSE parse error:', parseErr, 'line:', data);
+          }
         }
+      }
+
+      // If stream completed with no tokens, show a diagnostic message
+      if (tokenCount === 0 && !generatedCode) {
+        generatedCode = `// No response received from RAG service.\n// Debug: ${ragBaseUrl}/generate/debug\n// Check: docker compose logs langchain-rag`;
+        renderCode(generatedCode);
       }
     }
 
