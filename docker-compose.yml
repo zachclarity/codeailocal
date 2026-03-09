@@ -1,15 +1,15 @@
+version: "3.9"
+
 services:
+  # ─── Ollama LLM Server ───────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: localcoder-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    restart: unless-stopped
-    # Uncomment the appropriate section for your hardware:
-
-    # --- NVIDIA GPU support ---
+    # ── Uncomment below ONLY if you have NVIDIA GPU + nvidia-container-toolkit ──
     # deploy:
     #   resources:
     #     reservations:
@@ -17,44 +17,48 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
-    # --- AMD GPU support (ROCm) ---
-    # image: ollama/ollama:rocm
-    # devices:
-    #   - /dev/kfd
-    #   - /dev/dri
+  # ─── Model Bootstrapper (pulls Qwen2.5-Coder on first run) ──
 
-  # One-shot service to pull and run the model via the ollama service
-  model-pull:
-    image: ollama/ollama:latest
-    container_name: ollama-model-pull
-    depends_on:
-      - ollama
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    entrypoint: >
-      sh -c '
-        echo "Waiting for Ollama to be ready..."
-        until ollama list > /dev/null 2>&1; do
-          sleep 2
-        done
-        echo "Pulling and running qwen3-coder..."
-        ollama run qwen2.5-coder:0.5b --keepalive 0 ""
-      '
-    restart: "no"
-
-  # Simple web server for the Spring Forge UI
-  spring-forge-ui:
-    image: nginx:alpine
-    container_name: spring-forge-ui
+  # ─── Go Backend API ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: localcoder-backend
     ports:
-      - "8080:80"
+      - "8080:8080"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - PORT=8080
+      - RAG_DATA_PATH=/data/rag/snippets.json
+      - WORKSPACE_PATH=/workspace
     volumes:
-      - ./spring-coder.html:/usr/share/nginx/html/index.html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - rag_data:/data/rag
+      - ${WORKSPACE_DIR:-./workspace}:/workspace:ro
+
+    
+    restart: unless-stopped
+
+  # ─── Frontend (Nginx) ───────────────────────────────────────
+  frontend:
+    image: nginx:alpine
+    container_name: localcoder-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - ollama
+      - backend
     restart: unless-stopped
 
 volumes:
   ollama_data:
+  rag_data:

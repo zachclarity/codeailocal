@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalCoder — AI Code Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<style>
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2129;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --border-bright: #484f58;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --accent: #58a6ff;
+  --accent-glow: rgba(88, 166, 255, 0.15);
+  --green: #3fb950;
+  --green-glow: rgba(63, 185, 80, 0.12);
+  --orange: #d29922;
+  --red: #f85149;
+  --purple: #bc8cff;
+  --purple-glow: rgba(188, 140, 255, 0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Top Bar ──────────────────────────────────────────── */
+.topbar {
+  height: 48px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 15px;
+  letter-spacing: -0.02em; white-space: nowrap;
+}
+.logo-icon {
+  width: 24px; height: 24px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.topbar-divider { width: 1px; height: 24px; background: var(--border); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-muted); transition: background 0.3s;
+}
+.status-dot.connected { background: var(--green); box-shadow: 0 0 8px rgba(63,185,80,0.4); }
+.status-text { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.rag-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  background: var(--purple-glow); border: 1px solid rgba(188,140,255,0.3);
+  color: var(--purple);
+}
+.rag-badge .count { 
+  background: rgba(188,140,255,0.2); padding: 1px 6px; border-radius: 10px;
+  font-size: 10px;
+}
+.topbar-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+/* ─── Buttons ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 6px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--bg-tertiary);
+  color: var(--text-primary); cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--border-bright); background: var(--bg-secondary); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: #4c9aed; }
+.btn-green { background: rgba(63,185,80,0.15); border-color: rgba(63,185,80,0.3); color: var(--green); }
+.btn-green:hover { background: rgba(63,185,80,0.25); }
+.btn-purple { background: var(--purple-glow); border-color: rgba(188,140,255,0.3); color: var(--purple); }
+.btn-purple:hover { background: rgba(188,140,255,0.25); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-xs { padding: 3px 8px; font-size: 11px; }
+.btn-icon {
+  width: 32px; height: 32px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-danger { background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); color: var(--red); }
+.btn-danger:hover { background: rgba(248,81,73,0.2); }
+
+/* ─── Main Layout ──────────────────────────────────────── */
+.main-layout { flex: 1; display: flex; overflow: hidden; }
+
+/* ─── Sidebar (AI Chat) ───────────────────────────────── */
+.sidebar {
+  width: 380px; min-width: 300px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  transition: width 0.2s;
+}
+.sidebar.collapsed { width: 0; min-width: 0; overflow: hidden; border-right: none; }
+
+.sidebar-header {
+  height: 42px; padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.sidebar-header svg { opacity: 0.6; }
+
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.chat-msg {
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6;
+  max-width: 95%; word-wrap: break-word;
+}
+.chat-msg.user {
+  background: var(--accent-glow); border: 1px solid rgba(88,166,255,0.2);
+  align-self: flex-end; border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant {
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  align-self: flex-start; border-bottom-left-radius: 4px;
+}
+.chat-msg pre {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px; margin: 8px 0;
+  overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;
+}
+.chat-msg code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg-primary); padding: 2px 5px; border-radius: 3px; font-size: 12px;
+}
+.chat-msg pre code { background: none; padding: 0; }
+
+.rag-indicator {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 6px; margin-bottom: 4px;
+  background: var(--purple-glow); border: 1px solid rgba(188,140,255,0.15);
+  font-size: 11px; color: var(--purple);
+}
+
+.chat-input-area { padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.chat-rag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1; padding: 10px 14px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: inherit; font-size: 13px; outline: none; resize: none;
+  min-height: 40px; max-height: 120px;
+}
+.chat-input:focus { border-color: var(--accent); }
+.chat-input::placeholder { color: var(--text-muted); }
+
+/* ─── Toggle Switch ────────────────────────────────────── */
+.toggle {
+  position: relative; width: 36px; height: 20px;
+  display: inline-block; flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--border); border-radius: 20px;
+  cursor: pointer; transition: 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  width: 16px; height: 16px; left: 2px; bottom: 2px;
+  background: var(--text-secondary); border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--purple); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #fff; }
+
+.toggle-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary); cursor: pointer;
+  user-select: none;
+}
+
+/* ─── Editor Area ──────────────────────────────────────── */
+.editor-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.editor-toolbar {
+  height: 42px; padding: 0 12px;
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.file-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+.file-tab {
+  padding: 6px 14px; border-radius: 6px 6px 0 0;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid transparent; border-bottom: none;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.15s;
+}
+.file-tab:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+.file-tab.active { background: var(--bg-primary); color: var(--text-primary); border-color: var(--border); }
+.file-tab .dot { width: 8px; height: 8px; border-radius: 50%; }
+.file-tab .dot.html { background: #f97583; }
+.file-tab .dot.py { background: #79c0ff; }
+.file-tab .dot.go { background: #56d4dd; }
+.file-tab .dot.js { background: #e3b341; }
+.tab-close {
+  width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; opacity: 0; transition: opacity 0.15s; font-size: 14px;
+}
+.file-tab:hover .tab-close { opacity: 0.6; }
+.tab-close:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
+
+.editor-container { flex: 1; position: relative; overflow: hidden; }
+.CodeMirror {
+  height: 100% !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+}
+
+/* ─── Generate Bar ─────────────────────────────────────── */
+.generate-bar {
+  position: absolute; bottom: 16px; left: 50%;
+  transform: translateX(-50%); width: min(92%, 750px);
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 14px; padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 50;
+}
+.gen-top-row { display: flex; gap: 8px; align-items: flex-end; }
+.gen-options-row { display: flex; gap: 10px; align-items: center; padding: 2px 4px; }
+.generate-input {
+  flex: 1; padding: 10px 14px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: inherit; font-size: 13px; outline: none; resize: none;
+  min-height: 40px; max-height: 100px;
+}
+.generate-input:focus { border-color: var(--accent); }
+.generate-input::placeholder { color: var(--text-muted); }
+
+.template-select {
+  padding: 8px 28px 8px 12px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: inherit; font-size: 12px; outline: none; cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.template-select option { background: var(--bg-secondary); }
+
+/* ─── Right Panel (Snippets / RAG) ─────────────────────── */
+.right-panel {
+  width: 0; overflow: hidden;
+  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex; flex-direction: column;
+  transition: width 0.25s;
+}
+.right-panel.open { width: 400px; min-width: 320px; }
+
+.panel-header {
+  height: 42px; padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.panel-tabs {
+  display: flex; gap: 0; flex: 1;
+}
+.panel-tab {
+  padding: 8px 14px; font-size: 12px; font-weight: 500;
+  cursor: pointer; color: var(--text-secondary);
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.panel-tab:hover { color: var(--text-primary); }
+.panel-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+.panel-close { cursor: pointer; opacity: 0.6; }
+.panel-close:hover { opacity: 1; }
+
+.panel-content { flex: 1; overflow-y: auto; padding: 14px; }
+.panel-actions { padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+/* Snippet Cards */
+.snippet-card {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; margin-bottom: 10px;
+  transition: border-color 0.15s; cursor: default;
+}
+.snippet-card:hover { border-color: var(--border-bright); }
+.snippet-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+.snippet-title { font-size: 13px; font-weight: 600; flex: 1; }
+.snippet-meta { display: flex; gap: 6px; align-items: center; }
+.snippet-lang {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--accent-glow); color: var(--accent);
+}
+.snippet-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.snippet-tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary);
+}
+.snippet-preview {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.5;
+  background: var(--bg-tertiary); border-radius: 6px; padding: 8px;
+  max-height: 100px; overflow: hidden;
+  color: var(--text-secondary); white-space: pre; text-overflow: ellipsis;
+}
+.snippet-actions { display: flex; gap: 4px; margin-top: 8px; }
+.snippet-score {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: var(--green-glow); color: var(--green); font-weight: 600;
+}
+
+/* Scan & Search */
+.scan-section, .search-section { margin-bottom: 16px; }
+.scan-section h3, .search-section h3 {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+}
+.input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.input-field {
+  flex: 1; padding: 8px 12px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary);
+  font-family: inherit; font-size: 12px; outline: none;
+}
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--text-muted); }
+
+/* Stats */
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+}
+.stat-card {
+  padding: 12px; border-radius: 8px;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  text-align: center;
+}
+.stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+.stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+/* Add Snippet Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  width: 560px; max-height: 80vh;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.5);
+}
+.modal h2 { font-size: 16px; font-weight: 700; }
+.modal label { font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+.modal textarea {
+  width: 100%; min-height: 140px; padding: 10px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  outline: none; resize: vertical;
+}
+.modal textarea:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ─── Preview Panel ────────────────────────────────────── */
+.preview-panel {
+  width: 0; overflow: hidden;
+  border-left: 1px solid var(--border); background: #fff;
+  display: flex; flex-direction: column; transition: width 0.2s;
+}
+.preview-panel.open { width: 45%; min-width: 350px; }
+.preview-toolbar {
+  height: 42px; padding: 0 12px;
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.preview-url {
+  flex: 1; padding: 5px 12px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.preview-frame { flex: 1; border: none; background: #fff; }
+
+/* ─── Animations ───────────────────────────────────────── */
+.streaming-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1s infinite; margin-left: 4px; vertical-align: middle;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.typing-indicator { display: flex; gap: 4px; padding: 12px 16px; align-self: flex-start; }
+.typing-indicator span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-muted); animation: typing 1.4s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* ─── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+/* ─── Toast ────────────────────────────────────────────── */
+.toast-container {
+  position: fixed; top: 60px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px; z-index: 1000;
+}
+.toast {
+  padding: 10px 16px; border-radius: 8px; font-size: 13px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  color: var(--text-primary); animation: slideIn 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--red); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Welcome */
+.welcome-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.welcome-card {
+  padding: 12px; border-radius: 8px;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+.welcome-card:hover { border-color: var(--accent); background: var(--accent-glow); }
+.welcome-card strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.welcome-card span { color: var(--text-secondary); }
+
+.empty-state {
+  text-align: center; padding: 30px 20px; color: var(--text-muted);
+}
+.empty-state svg { opacity: 0.3; margin-bottom: 12px; }
+.empty-state p { font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- ═══ Top Bar ═══ -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">LC</div>
+    LocalCoder
+  </div>
+  <div class="topbar-divider"></div>
+  <div class="status-dot" id="statusDot"></div>
+  <span class="status-text" id="statusText">Connecting...</span>
+  <div class="rag-badge" id="ragBadge" style="display:none">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h4l2 2h6v10H2V2zm2 1v11h10V5H7.5L5.5 3H4z"/></svg>
+    RAG <span class="count" id="ragCount">0</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-sm" onclick="toggleSidebar()" title="AI Chat (Ctrl+B)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v8a1 1 0 01-1 1H5l-3 3V3z"/></svg>
+      Chat
+    </button>
+    <button class="btn btn-sm btn-purple" onclick="toggleSnippetPanel()" title="Snippets & RAG (Ctrl+K)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h4l2 2h6v10H2V2zm2 1v11h10V5H7.5L5.5 3H4z"/></svg>
+      Snippets
+    </button>
+    <button class="btn btn-sm btn-green" onclick="runPreview()" title="Preview (Ctrl+Enter)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
+      Preview
+    </button>
+    <button class="btn btn-sm" onclick="saveToSnippets()" title="Save current code to RAG">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1h8l3 3v9a2 2 0 01-2 2H3a2 2 0 01-2-2V3a2 2 0 012-2zm5 10a2 2 0 100-4 2 2 0 000 4zM4 2v3h6V2H4z"/></svg>
+    </button>
+    <button class="btn btn-sm" onclick="addNewTab()" title="New File">+</button>
+  </div>
+</div>
+
+<!-- ═══ Main Layout ═══ -->
+<div class="main-layout">
+
+  <!-- Sidebar: AI Chat -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 3a1 1 0 100 2 1 1 0 000-2zM7 7v5h2V7H7z"/></svg>
+      AI Assistant
+      <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:auto">qwen2.5-coder</span>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-msg assistant">
+        <strong style="color:var(--accent)">Welcome to LocalCoder!</strong><br><br>
+        Powered by <strong>Qwen2.5-Coder</strong> via Ollama with <strong style="color:var(--purple)">RAG</strong> from your local snippets.
+        <div class="welcome-cards">
+          <div class="welcome-card" onclick="quickPrompt('Create a responsive landing page with hero section, features grid and footer using Tailwind CSS')">
+            <strong>🎨 Landing Page</strong><span>Tailwind hero + features</span>
+          </div>
+          <div class="welcome-card" onclick="quickPrompt('Create a Python Flask CRUD API for a todo list with in-memory storage')">
+            <strong>🐍 Python CRUD</strong><span>Flask REST API</span>
+          </div>
+          <div class="welcome-card" onclick="quickPrompt('Create a dashboard with charts showing sales data using HTML and JavaScript')">
+            <strong>📊 Dashboard</strong><span>Charts & stats</span>
+          </div>
+          <div class="welcome-card" onclick="quickPrompt('Create a Go HTTP API for a bookstore with CRUD operations')">
+            <strong>🔷 Go API</strong><span>stdlib REST API</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <div class="chat-rag-row">
+        <label class="toggle-label">
+          <label class="toggle">
+            <input type="checkbox" id="chatRAGToggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          RAG Context
+        </label>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:auto" id="chatRAGInfo">snippets will augment responses</span>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="Ask about your code..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+        <button class="btn btn-primary btn-icon" onclick="sendChat()" title="Send">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 1l14 7-14 7V9l10-1-10-1V1z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-area">
+    <div class="editor-toolbar">
+      <div class="file-tabs" id="fileTabs"></div>
+    </div>
+    <div class="editor-container" id="editorContainer">
+      <div class="generate-bar" id="generateBar">
+        <div class="gen-top-row">
+          <select class="template-select" id="templateSelect">
+            <option value="html">HTML</option>
+            <option value="tailwind">Tailwind CSS</option>
+            <option value="python-crud">Python CRUD</option>
+            <option value="python-frontend">Python Frontend</option>
+            <option value="go-api">Go API</option>
+            <option value="">Auto-detect</option>
+          </select>
+          <textarea class="generate-input" id="generateInput" placeholder="Describe what to generate... (Ctrl+G)" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();generateCode()}"></textarea>
+          <button class="btn btn-primary" onclick="generateCode()" id="generateBtn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v4l3-2L8 1zM5 3L8 5V1L5 3zM1 8h4L3 5 1 8zm2 3l2-3H1l2 3zm5 4v-4l-3 2 3 2zm3-2l-3-2v4l3-2zm4-5h-4l2 3 2-3zm-2-3l-2 3h4l-2-3z"/></svg>
+            Generate
+          </button>
+        </div>
+        <div class="gen-options-row">
+          <label class="toggle-label">
+            <label class="toggle">
+              <input type="checkbox" id="genRAGToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            Use RAG
+          </label>
+          <span style="font-size:11px;color:var(--text-muted)">augment with local code snippets</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel: Snippets & RAG -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-header">
+      <div class="panel-tabs">
+        <div class="panel-tab active" data-tab="snippets" onclick="switchPanelTab('snippets')">Snippets</div>
+        <div class="panel-tab" data-tab="search" onclick="switchPanelTab('search')">Search</div>
+        <div class="panel-tab" data-tab="manage" onclick="switchPanelTab('manage')">Manage</div>
+      </div>
+      <span class="panel-close" onclick="toggleSnippetPanel()">✕</span>
+    </div>
+
+    <!-- Snippets Tab -->
+    <div class="panel-content" id="tab-snippets">
+      <div id="snippetsList"></div>
+    </div>
+
+    <!-- Search Tab -->
+    <div class="panel-content" id="tab-search" style="display:none">
+      <div class="search-section">
+        <h3>Semantic Code Search</h3>
+        <div class="input-row">
+          <input class="input-field" id="ragSearchInput" placeholder="e.g. flask crud authentication" 
+            onkeydown="if(event.key==='Enter')searchSnippets()">
+          <button class="btn btn-sm btn-purple" onclick="searchSnippets()">Search</button>
+        </div>
+        <div class="input-row">
+          <select class="template-select" id="searchLangFilter" style="flex:none;width:120px">
+            <option value="">All Languages</option>
+            <option value="html">HTML</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="go">Go</option>
+            <option value="css">CSS</option>
+          </select>
+        </div>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+    <!-- Manage Tab -->
+    <div class="panel-content" id="tab-manage" style="display:none">
+      <div class="stats-grid" id="ragStats">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">Total Snippets</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statTokens">0</div>
+          <div class="stat-label">Index Tokens</div>
+        </div>
+      </div>
+
+      <div class="scan-section">
+        <h3>Import from Directory</h3>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
+          Scan a mounted directory to import code files into the RAG index.
+        </p>
+        <div class="input-row">
+          <input class="input-field" id="scanPathInput" value="/workspace" placeholder="/path/to/code">
+          <button class="btn btn-sm btn-purple" onclick="scanDirectory()" id="scanBtn">Scan</button>
+        </div>
+        <div id="scanStatus" style="font-size:12px;color:var(--text-secondary);margin-top:6px"></div>
+      </div>
+
+      <div class="scan-section">
+        <h3>Languages</h3>
+        <div id="langBreakdown" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
+      <div style="margin-top:20px">
+        <button class="btn btn-sm btn-danger" onclick="clearAllSnippets()">Clear All Snippets</button>
+      </div>
+    </div>
+
+    <div class="panel-actions">
+      <button class="btn btn-sm btn-purple" onclick="showAddModal()" style="width:100%">
+        + Add Snippet
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview Panel -->
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-toolbar">
+      <div class="preview-url" id="previewUrl">about:blank</div>
+      <button class="btn btn-sm" onclick="closePreview()">✕</button>
+    </div>
+    <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-forms allow-modals"></iframe>
+  </div>
+</div>
+
+<!-- Add Snippet Modal -->
+<div class="modal-overlay hidden" id="addModal">
+  <div class="modal">
+    <h2>Add Code Snippet</h2>
+    <div>
+      <label>Title</label>
+      <input class="input-field" id="modalTitle" placeholder="e.g. Flask Auth Middleware" style="width:100%">
+    </div>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label>Language</label>
+        <select class="template-select" id="modalLang" style="width:100%">
+          <option value="">Auto-detect</option>
+          <option value="html">HTML</option>
+          <option value="javascript">JavaScript</option>
+          <option value="python">Python</option>
+          <option value="go">Go</option>
+          <option value="css">CSS</option>
+          <option value="sql">SQL</option>
+          <option value="bash">Bash</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label>Tags (comma-separated)</label>
+        <input class="input-field" id="modalTags" placeholder="crud, auth, api" style="width:100%">
+      </div>
+    </div>
+    <div>
+      <label>Code</label>
+      <textarea id="modalCode" placeholder="Paste your code here..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="hideAddModal()">Cancel</button>
+      <button class="btn btn-sm btn-purple" onclick="addSnippetFromModal()">Add to RAG</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ═══ State ═══════════════════════════════════════════════════
+const state = {
+  files: [], activeFile: null, editors: {},
+  chatHistory: [], isGenerating: false, isChatting: false,
+  previewOpen: false, sidebarOpen: true, snippetPanelOpen: false,
+  snippets: [], ragSnippetCount: 0,
+};
+
+// ═══ Init ════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  addFile('index.html', 'htmlmixed', getDefaultHTML());
+  checkHealth();
+  loadSnippets();
+  loadRAGStats();
+  setInterval(checkHealth, 15000);
+});
+
+// ═══ File / Tab Management ═══════════════════════════════════
+function addFile(name, mode, content = '') {
+  if (state.files.find(f => f.name === name)) { switchTab(name); return; }
+  state.files.push({ name, mode, content });
+  renderTabs();
+  switchTab(name);
+}
+function addNewTab() {
+  const types = [
+    { ext: 'html', mode: 'htmlmixed', content: getDefaultHTML() },
+    { ext: 'py', mode: 'python', content: '# Python file\n' },
+    { ext: 'js', mode: 'javascript', content: '// JavaScript file\n' },
+  ];
+  const t = types[state.files.length % types.length];
+  addFile(`file${state.files.length}.${t.ext}`, t.mode, t.content);
+}
+function removeFile(name, evt) {
+  evt.stopPropagation();
+  if (state.files.length <= 1) return;
+  state.files = state.files.filter(f => f.name !== name);
+  delete state.editors[name];
+  if (state.activeFile === name) switchTab(state.files[0].name);
+  renderTabs();
+}
+function switchTab(name) {
+  if (state.activeFile && state.editors[state.activeFile]) {
+    const f = state.files.find(f => f.name === state.activeFile);
+    if (f) f.content = state.editors[state.activeFile].getValue();
+  }
+  state.activeFile = name;
+  renderTabs();
+  const container = document.getElementById('editorContainer');
+  Object.keys(state.editors).forEach(k => { state.editors[k].getWrapperElement().style.display = 'none'; });
+  if (state.editors[name]) {
+    state.editors[name].getWrapperElement().style.display = '';
+    state.editors[name].refresh();
+  } else {
+    const file = state.files.find(f => f.name === name);
+    const ta = document.createElement('textarea');
+    container.insertBefore(ta, container.firstChild);
+    const cm = CodeMirror.fromTextArea(ta, {
+      mode: file.mode, theme: 'dracula', lineNumbers: true,
+      autoCloseBrackets: true, autoCloseTags: true,
+      foldGutter: true, gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+      tabSize: 2, indentWithTabs: false, matchBrackets: true,
+    });
+    cm.setValue(file.content);
+    state.editors[name] = cm;
+    setTimeout(() => cm.refresh(), 10);
+  }
+  const ext = name.split('.').pop();
+  const sel = document.getElementById('templateSelect');
+  if (ext === 'html') sel.value = 'tailwind';
+  else if (ext === 'py') sel.value = 'python-crud';
+  else if (ext === 'go') sel.value = 'go-api';
+  else sel.value = 'html';
+}
+function renderTabs() {
+  document.getElementById('fileTabs').innerHTML = state.files.map(f => {
+    const ext = f.name.split('.').pop();
+    return `<div class="file-tab ${f.name === state.activeFile ? 'active' : ''}" onclick="switchTab('${f.name}')">
+      <span class="dot ${ext}"></span>${f.name}
+      <span class="tab-close" onclick="removeFile('${f.name}', event)">×</span></div>`;
+  }).join('');
+}
+
+// ═══ Code Generation (RAG-augmented) ═════════════════════════
+async function generateCode() {
+  if (state.isGenerating) return;
+  const prompt = document.getElementById('generateInput').value.trim();
+  if (!prompt) return;
+  const template = document.getElementById('templateSelect').value;
+  const useRAG = document.getElementById('genRAGToggle').checked;
+  const context = getCurrentCode();
+
+  state.isGenerating = true;
+  document.getElementById('generateBtn').innerHTML = '<span class="streaming-dot"></span> Generating...';
+  document.getElementById('generateInput').value = '';
+
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, template, context, use_rag: useRAG, rag_language: '' }),
+    });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '', buffer = '';
+
+    const extMap = { html: 'html', tailwind: 'html', 'python-crud': 'py', 'python-frontend': 'html', 'go-api': 'go' };
+    const ext = extMap[template] || 'html';
+    const modeMap = { html: 'htmlmixed', py: 'python', go: 'text/x-go', js: 'javascript' };
+
+    let targetFile = state.activeFile;
+    if (targetFile.split('.').pop() !== ext) {
+      addFile(`generated.${ext}`, modeMap[ext] || 'htmlmixed', '');
+      targetFile = `generated.${ext}`;
+    }
+    const editor = state.editors[targetFile];
+    editor.setValue('');
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.content) { fullContent += parsed.content; editor.setValue(fullContent); editor.setCursor(editor.lineCount() - 1); }
+        } catch (e) {}
+      }
+    }
+    let cleaned = fullContent.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
+    if (cleaned !== fullContent) editor.setValue(cleaned);
+    const file = state.files.find(f => f.name === targetFile);
+    if (file) file.content = editor.getValue();
+    toast(useRAG ? 'Generated with RAG context!' : 'Code generated!', 'success');
+    if (ext === 'html') setTimeout(() => runPreview(), 300);
+  } catch (err) {
+    toast('Generation failed: ' + err.message, 'error');
+  } finally {
+    state.isGenerating = false;
+    document.getElementById('generateBtn').innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v4l3-2L8 1zM5 3L8 5V1L5 3zM1 8h4L3 5 1 8zm2 3l2-3H1l2 3zm5 4v-4l-3 2 3 2zm3-2l-3-2v4l3-2zm4-5h-4l2 3 2-3zm-2-3l-2 3h4l-2-3z"/></svg> Generate`;
+  }
+}
+
+// ═══ AI Chat (RAG-augmented) ═════════════════════════════════
+async function sendChat() {
+  if (state.isChatting) return;
+  const input = document.getElementById('chatInput');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  const useRAG = document.getElementById('chatRAGToggle').checked;
+
+  input.value = '';
+  addChatMessage('user', prompt);
+  state.chatHistory.push({ role: 'user', content: prompt });
+  state.isChatting = true;
+
+  const chatBox = document.getElementById('chatMessages');
+
+  // Show RAG indicator
+  if (useRAG) {
+    const ragEl = document.createElement('div');
+    ragEl.className = 'rag-indicator';
+    ragEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h4l2 2h6v10H2V2z"/></svg> Retrieving relevant snippets...';
+    ragEl.id = 'ragIndicator';
+    chatBox.appendChild(ragEl);
+  }
+
+  const typingEl = document.createElement('div');
+  typingEl.className = 'typing-indicator';
+  typingEl.innerHTML = '<span></span><span></span><span></span>';
+  chatBox.appendChild(typingEl);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: state.chatHistory, context: getCurrentCode(), use_rag: useRAG }),
+    });
+    typingEl.remove();
+    const ragInd = document.getElementById('ragIndicator');
+    if (ragInd) { ragInd.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h4l2 2h6v10H2V2z"/></svg> RAG context applied ✓'; setTimeout(() => ragInd.remove(), 3000); }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '', buffer = '';
+    const msgEl = document.createElement('div');
+    msgEl.className = 'chat-msg assistant';
+    chatBox.appendChild(msgEl);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.content) { fullContent += parsed.content; msgEl.innerHTML = formatMarkdown(fullContent); chatBox.scrollTop = chatBox.scrollHeight; }
+        } catch (e) {}
+      }
+    }
+    state.chatHistory.push({ role: 'assistant', content: fullContent });
+    if (fullContent.includes('```')) {
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'btn btn-sm btn-green';
+      applyBtn.style.marginTop = '8px';
+      applyBtn.textContent = '📋 Apply to Editor';
+      applyBtn.onclick = () => applyCodeFromChat(fullContent);
+      msgEl.appendChild(applyBtn);
+    }
+  } catch (err) {
+    typingEl.remove();
+    addChatMessage('assistant', '⚠️ Error: ' + err.message);
+  } finally {
+    state.isChatting = false;
+  }
+}
+function addChatMessage(role, content) {
+  const chatBox = document.getElementById('chatMessages');
+  const el = document.createElement('div');
+  el.className = `chat-msg ${role}`;
+  el.innerHTML = role === 'user' ? escapeHtml(content) : formatMarkdown(content);
+  chatBox.appendChild(el);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+function applyCodeFromChat(content) {
+  const m = content.match(/```[\w]*\n([\s\S]*?)```/);
+  if (m) { state.editors[state.activeFile]?.setValue(m[1].trim()); toast('Code applied', 'success'); }
+}
+function quickPrompt(prompt) {
+  document.getElementById('generateInput').value = prompt;
+  if (prompt.includes('Tailwind')) document.getElementById('templateSelect').value = 'tailwind';
+  else if (prompt.includes('Flask') || prompt.includes('Python')) document.getElementById('templateSelect').value = 'python-crud';
+  else if (prompt.includes('Go')) document.getElementById('templateSelect').value = 'go-api';
+  generateCode();
+}
+
+// ═══ Snippet Panel ═══════════════════════════════════════════
+function toggleSnippetPanel() {
+  state.snippetPanelOpen = !state.snippetPanelOpen;
+  document.getElementById('rightPanel').classList.toggle('open', state.snippetPanelOpen);
+  if (state.snippetPanelOpen) { loadSnippets(); loadRAGStats(); }
+}
+function switchPanelTab(tab) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  ['snippets', 'search', 'manage'].forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'manage') loadRAGStats();
+  if (tab === 'snippets') loadSnippets();
+}
+
+async function loadSnippets() {
+  try {
+    const resp = await fetch('/api/snippets');
+    const data = await resp.json();
+    state.snippets = data.snippets || [];
+    renderSnippetsList(state.snippets);
+    updateRAGBadge(state.snippets.length);
+  } catch (e) { console.error('Load snippets error:', e); }
+}
+
+function renderSnippetsList(snippets) {
+  const el = document.getElementById('snippetsList');
+  if (!snippets || snippets.length === 0) {
+    el.innerHTML = `<div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h4l2 2h6v10H2V2zm2 1v11h10V5H7.5L5.5 3H4z"/></svg>
+      <p>No snippets yet.<br>Add code snippets or scan a directory<br>to build your RAG knowledge base.</p></div>`;
+    return;
+  }
+  el.innerHTML = snippets.map(s => `
+    <div class="snippet-card">
+      <div class="snippet-header">
+        <span class="snippet-title">${escapeHtml(s.title)}</span>
+        <div class="snippet-meta">
+          <span class="snippet-lang">${s.language || 'text'}</span>
+        </div>
+      </div>
+      ${s.tags?.length ? `<div class="snippet-tags">${s.tags.map(t => `<span class="snippet-tag">${t}</span>`).join('')}</div>` : ''}
+      <div class="snippet-preview">${escapeHtml((s.code || '').substring(0, 300))}</div>
+      <div class="snippet-actions">
+        <button class="btn btn-xs btn-green" onclick="loadSnippetToEditor('${s.id}')">Insert</button>
+        <button class="btn btn-xs btn-danger" onclick="deleteSnippet('${s.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderSearchResults(results) {
+  const el = document.getElementById('searchResults');
+  if (!results || results.length === 0) {
+    el.innerHTML = '<div class="empty-state"><p>No matching snippets found.</p></div>';
+    return;
+  }
+  el.innerHTML = results.map(r => `
+    <div class="snippet-card">
+      <div class="snippet-header">
+        <span class="snippet-title">${escapeHtml(r.snippet.title)}</span>
+        <div class="snippet-meta">
+          <span class="snippet-score">${Math.round(r.score * 100)}%</span>
+          <span class="snippet-lang">${r.snippet.language || 'text'}</span>
+        </div>
+      </div>
+      ${r.snippet.tags?.length ? `<div class="snippet-tags">${r.snippet.tags.map(t => `<span class="snippet-tag">${t}</span>`).join('')}</div>` : ''}
+      <div class="snippet-preview">${escapeHtml((r.snippet.code || '').substring(0, 300))}</div>
+      <div class="snippet-actions">
+        <button class="btn btn-xs btn-green" onclick="loadSnippetToEditor('${r.snippet.id}')">Insert</button>
+      </div>
+    </div>`).join('');
+}
+
+async function searchSnippets() {
+  const query = document.getElementById('ragSearchInput').value.trim();
+  if (!query) return;
+  const lang = document.getElementById('searchLangFilter').value;
+  try {
+    const resp = await fetch('/api/rag/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, max_results: 10, language: lang }),
+    });
+    const data = await resp.json();
+    renderSearchResults(data.results);
+  } catch (e) { toast('Search failed: ' + e.message, 'error'); }
+}
+
+async function loadSnippetToEditor(id) {
+  const snippet = state.snippets.find(s => s.id === id);
+  if (!snippet) return;
+  const editor = state.editors[state.activeFile];
+  if (editor) {
+    const cursor = editor.getCursor();
+    editor.replaceRange(snippet.code, cursor);
+    toast('Snippet inserted', 'success');
+  }
+}
+
+async function deleteSnippet(id) {
+  try {
+    await fetch(`/api/snippets?id=${id}`, { method: 'DELETE' });
+    toast('Snippet deleted', 'success');
+    loadSnippets();
+    loadRAGStats();
+  } catch (e) { toast('Delete failed', 'error'); }
+}
+
+async function saveToSnippets() {
+  const code = getCurrentCode();
+  if (!code.trim()) { toast('Editor is empty', 'error'); return; }
+  document.getElementById('modalTitle').value = state.activeFile;
+  document.getElementById('modalCode').value = code;
+  const ext = state.activeFile.split('.').pop();
+  const langMap = { html: 'html', py: 'python', js: 'javascript', go: 'go', css: 'css' };
+  document.getElementById('modalLang').value = langMap[ext] || '';
+  document.getElementById('modalTags').value = '';
+  showAddModal();
+}
+
+function showAddModal() { document.getElementById('addModal').classList.remove('hidden'); }
+function hideAddModal() { document.getElementById('addModal').classList.add('hidden'); }
+
+async function addSnippetFromModal() {
+  const title = document.getElementById('modalTitle').value.trim() || 'Untitled';
+  const code = document.getElementById('modalCode').value;
+  const language = document.getElementById('modalLang').value;
+  const tags = document.getElementById('modalTags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+  if (!code.trim()) { toast('Code is required', 'error'); return; }
+
+  try {
+    await fetch('/api/snippets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, code, language, tags }),
+    });
+    hideAddModal();
+    toast('Snippet added to RAG!', 'success');
+    loadSnippets();
+    loadRAGStats();
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+async function scanDirectory() {
+  const path = document.getElementById('scanPathInput').value.trim();
+  if (!path) return;
+  const btn = document.getElementById('scanBtn');
+  btn.textContent = 'Scanning...';
+  btn.disabled = true;
+  document.getElementById('scanStatus').textContent = 'Scanning files...';
+
+  try {
+    const resp = await fetch('/api/rag/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      document.getElementById('scanStatus').innerHTML = `✅ Imported <strong>${data.imported}</strong> files. Total: <strong>${data.total}</strong> snippets.`;
+      toast(`Imported ${data.imported} files!`, 'success');
+      loadSnippets();
+      loadRAGStats();
+    } else {
+      document.getElementById('scanStatus').textContent = '❌ ' + (data.message || 'Scan failed');
+    }
+  } catch (e) {
+    document.getElementById('scanStatus').textContent = '❌ Error: ' + e.message;
+  } finally {
+    btn.textContent = 'Scan';
+    btn.disabled = false;
+  }
+}
+
+async function loadRAGStats() {
+  try {
+    const resp = await fetch('/api/rag/stats');
+    const data = await resp.json();
+    document.getElementById('statTotal').textContent = data.total_snippets || 0;
+    document.getElementById('statTokens').textContent = data.index_tokens || 0;
+    updateRAGBadge(data.total_snippets || 0);
+
+    const langEl = document.getElementById('langBreakdown');
+    const langs = data.languages || {};
+    langEl.innerHTML = Object.entries(langs)
+      .sort((a, b) => b[1] - a[1])
+      .map(([lang, count]) => `<span class="snippet-tag">${lang}: ${count}</span>`)
+      .join('');
+  } catch (e) {}
+}
+
+async function clearAllSnippets() {
+  if (!confirm('Clear all snippets from the RAG index? This cannot be undone.')) return;
+  try {
+    await fetch('/api/rag/clear', { method: 'POST' });
+    toast('All snippets cleared', 'success');
+    loadSnippets();
+    loadRAGStats();
+  } catch (e) { toast('Clear failed', 'error'); }
+}
+
+function updateRAGBadge(count) {
+  state.ragSnippetCount = count;
+  const badge = document.getElementById('ragBadge');
+  const countEl = document.getElementById('ragCount');
+  if (count > 0) { badge.style.display = ''; countEl.textContent = count; }
+  else { badge.style.display = 'none'; }
+  document.getElementById('chatRAGInfo').textContent = count > 0
+    ? `${count} snippets available` : 'no snippets indexed';
+}
+
+// ═══ Preview ═════════════════════════════════════════════════
+async function runPreview() {
+  const code = getCurrentCode();
+  if (state.activeFile.split('.').pop() !== 'html') { toast('Preview for HTML only', 'error'); return; }
+  try {
+    const resp = await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: state.activeFile, content: code }) });
+    const data = await resp.json();
+    document.getElementById('previewPanel').classList.add('open');
+    state.previewOpen = true;
+    document.getElementById('previewFrame').src = data.url || `/preview/${data.id}`;
+    document.getElementById('previewUrl').textContent = `localhost:3000${data.url || '/preview/' + data.id}`;
+  } catch {
+    document.getElementById('previewPanel').classList.add('open');
+    state.previewOpen = true;
+    document.getElementById('previewFrame').srcdoc = code;
+    document.getElementById('previewUrl').textContent = 'inline preview';
+  }
+}
+function closePreview() { document.getElementById('previewPanel').classList.remove('open'); state.previewOpen = false; }
+
+// ═══ Health ══════════════════════════════════════════════════
+async function checkHealth() {
+  try {
+    const resp = await fetch('/api/health');
+    const data = await resp.json();
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (data.ollama) {
+      dot.className = 'status-dot connected';
+      text.textContent = `Ollama ✓ | ${data.rag_snippets || 0} snippets`;
+    } else {
+      dot.className = 'status-dot';
+      text.textContent = 'Ollama offline — pulling model...';
+    }
+    if (data.rag_snippets) updateRAGBadge(data.rag_snippets);
+  } catch {
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'Backend offline';
+  }
+}
+
+// ═══ UI Helpers ══════════════════════════════════════════════
+function toggleSidebar() {
+  state.sidebarOpen = !state.sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+}
+function getCurrentCode() { return state.editors[state.activeFile]?.getValue() || ''; }
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function formatMarkdown(text) {
+  let h = escapeHtml(text);
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, (_, l, c) => `<pre><code>${c.trim()}</code></pre>`);
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+function getDefaultHTML() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-4xl font-bold text-gray-800 mb-4">Hello, LocalCoder!</h1>
+    <p class="text-lg text-gray-600">Start editing or use AI to generate code.</p>
+  </div>
+</body>
+</html>`;
+}
+
+// ═══ Keyboard Shortcuts ══════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'g') { e.preventDefault(); document.getElementById('generateInput').focus(); }
+  if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
+  if (e.ctrlKey && e.key === 'k') { e.preventDefault(); toggleSnippetPanel(); }
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); runPreview(); }
+  if (e.key === 'Escape') { if (state.previewOpen) closePreview(); if (state.snippetPanelOpen) toggleSnippetPanel(); hideAddModal(); }
+});
+
+document.querySelectorAll('textarea').forEach(ta => {
+  ta.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; });
+});
+</script>
+</body>
+</html>
